@@ -19,7 +19,7 @@
 use druid::text::EditAction;
 use druid::widget::prelude::*;
 use druid::widget::{LabelText, TextBox};
-use druid::{Data, HotKey, Insets, KbKey, Selector};
+use druid::{Data, FontDescriptor, Color, KeyOrValue, HotKey, Insets, KbKey, Selector};
 
 // we send this to ourselves if another widget takes focus, in order
 // to validate and move out of editing mode
@@ -83,6 +83,30 @@ impl<T: Data> EditableLabel<T> {
         self.text_box = self.text_box.with_placeholder(text);
         self
     }
+
+    /// Builder-style method for setting the font.
+    ///
+    /// The argument can be a [`FontDescriptor`] or a [`Key<FontDescriptor>`]
+    /// that refers to a font defined in the [`Env`].
+    ///
+    /// [`Env`]: ../struct.Env.html
+    /// [`FontDescriptor`]: ../struct.FontDescriptor.html
+    /// [`Key<FontDescriptor>`]: ../struct.Key.html
+    pub fn with_font(mut self, font: impl Into<KeyOrValue<FontDescriptor>>) -> Self {
+        self.text_box.set_font(font);
+        self
+    }
+
+
+    pub fn with_text_size(mut self, size: f64) -> Self {
+        self.text_box.set_text_size(size);
+        self
+    }
+
+    //pub fn with_text_color(mut self, color: impl Into<KeyOrValue<Color>>) -> Self {
+        //self.text_box.set_text_color(color);
+        //self
+    //}
 
     fn complete(&mut self, ctx: &mut EventCtx, data: &mut T) {
         if let Some(new) = (self.on_completion)(&self.buffer) {

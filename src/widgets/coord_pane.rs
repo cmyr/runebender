@@ -2,10 +2,11 @@
 //! selected point.
 
 use druid::kurbo::{Circle, Vec2};
-use druid::widget::{prelude::*, Controller, Either, Flex, Label, SizedBox};
-use druid::{Color, Point, WidgetExt};
+use druid::widget::{prelude::*, Controller, CrossAxisAlignment, Either, Flex, Label, SizedBox};
+use druid::{Color, FontDescriptor, FontFamily, FontStyle, Point, WidgetExt};
 
 use crate::edit_session::{CoordinateSelection, Quadrant};
+use crate::theme;
 use crate::widgets::EditableLabel;
 
 /// A panel for editing the selected coordinate
@@ -101,24 +102,45 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
         SizedBox::empty(),
     );
 
+    let coord_font = FontDescriptor::new(FontFamily::SYSTEM_UI).with_size(12.0);
+    let coord_label_font = FontDescriptor::new(FontFamily::SERIF).with_style(FontStyle::Italic);
     let coord_editor = Flex::column()
         .with_child(
             Flex::row()
-                .with_child(Label::new("x:").with_text_size(12.0))
-                .with_spacer(4.0)
-                .with_child(EditableLabel::parse().lens(point_x_lens).fix_width(40.0)),
+                .cross_axis_alignment(CrossAxisAlignment::Baseline)
+                .with_child(
+                    Label::new("x")
+                        .with_font(coord_label_font.clone())
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR),
+                )
+                .with_child(
+                    EditableLabel::parse()
+                        .with_font(coord_font.clone())
+                        .lens(point_x_lens)
+                        .fix_width(40.0),
+                ),
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("y:").with_text_size(12.0))
-                .with_spacer(4.0)
-                .with_child(EditableLabel::parse().lens(point_y_lens).fix_width(40.0)),
+                .cross_axis_alignment(CrossAxisAlignment::Baseline)
+                .with_child(
+                    Label::new("y")
+                        .with_font(coord_label_font.clone())
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR),
+                )
+                .with_child(
+                    EditableLabel::parse()
+                        .with_font(coord_font)
+                        .lens(point_y_lens)
+                        .fix_width(40.0),
+                ),
         )
         .lens(CoordinateSelection::quadrant_coord);
 
     let picker_and_editor = Flex::row()
         .with_child(coord_picker)
         .with_child(coord_editor)
+        //.debug_paint_layout()
         .padding(4.0);
 
     // if we have any points selected, show the numerical adjust widget, else an empty widget

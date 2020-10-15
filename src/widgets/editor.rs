@@ -211,8 +211,7 @@ impl Editor {
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         use druid::piet::{Color, RenderContext};
-        let rect =
-            Rect::ZERO.with_size((CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size());
+        let rect = (CANVAS_SIZE * data.session.viewport.zoom).to_rect();
         ctx.fill(rect, &Color::WHITE);
 
         draw::draw_session(
