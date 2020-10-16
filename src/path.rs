@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
 use druid::kurbo::{
-    BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg as KurboPathSeg, Point, Vec2,
+    Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg as KurboPathSeg, Point, Vec2,
 };
 use druid::Data;
 
@@ -412,30 +412,64 @@ impl Path {
     }
 
     pub fn nudge_points(&mut self, points: &[EntityId], v: DVec2) {
-        let mut to_nudge = HashSet::new();
+        let affine = Affine::translate(v.to_raw());
+        self.transform_points(points, affine);
+        //let mut to_nudge = HashSet::new();
+        //for point in points {
+        //let idx = match self.points.iter().position(|p| p.id == *point) {
+        //Some(idx) => idx,
+        //None => continue,
+        //};
+        //to_nudge.insert(idx);
+        //if self.points[idx].is_on_curve() {
+        //let prev = self.prev_idx(idx);
+        //let next = self.next_idx(idx);
+        //if !self.points[prev].is_on_curve() {
+        //to_nudge.insert(prev);
+        //}
+        //if !self.points[next].is_on_curve() {
+        //to_nudge.insert(next);
+        //}
+        //}
+        //}
+
+        //for idx in &to_nudge {
+        //self.nudge_point(*idx, v);
+        //if !self.points[*idx].is_on_curve() {
+        //if let Some((on_curve, handle)) = self.tangent_handle(*idx) {
+        //if !to_nudge.contains(&handle) {
+        //self.adjust_handle_angle(*idx, on_curve, handle);
+        //}
+        //}
+        //}
+        //}
+    }
+
+    pub fn transform_points(&mut self, points: &[EntityId], affine: Affine) {
+        let mut to_xform = HashSet::new();
         for point in points {
             let idx = match self.points.iter().position(|p| p.id == *point) {
                 Some(idx) => idx,
                 None => continue,
             };
-            to_nudge.insert(idx);
+            to_xform.insert(idx);
             if self.points[idx].is_on_curve() {
                 let prev = self.prev_idx(idx);
                 let next = self.next_idx(idx);
                 if !self.points[prev].is_on_curve() {
-                    to_nudge.insert(prev);
+                    to_xform.insert(prev);
                 }
                 if !self.points[next].is_on_curve() {
-                    to_nudge.insert(next);
+                    to_xform.insert(next);
                 }
             }
         }
 
-        for idx in &to_nudge {
-            self.nudge_point(*idx, v);
+        for idx in &to_xform {
+            self.transform_point(*idx, affine);
             if !self.points[*idx].is_on_curve() {
                 if let Some((on_curve, handle)) = self.tangent_handle(*idx) {
-                    if !to_nudge.contains(&handle) {
+                    if !to_xform.contains(&handle) {
                         self.adjust_handle_angle(*idx, on_curve, handle);
                     }
                 }
@@ -446,6 +480,11 @@ impl Path {
     fn nudge_point(&mut self, idx: usize, v: DVec2) {
         self.points_mut()[idx].point.x += v.x;
         self.points_mut()[idx].point.y += v.y;
+    }
+
+    fn transform_point(&mut self, idx: usize, affine: Affine) {
+        let new_point = affine * self.points()[idx].point.to_raw();
+        self.points_mut()[idx].point = DPoint::from_raw(new_point);
     }
 
     /// Returns the index for the on_curve point and the 'other' handle

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, ParamCurveNearest, Point, Rect, Shape, Size};
+use druid::kurbo::{Affine, BezPath, ParamCurveNearest, Point, Rect, Shape, Size, Vec2};
 use druid::{Data, Lens};
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
@@ -70,7 +70,9 @@ pub enum Quadrant {
 /// A type that is only created by a lens, for our coordinate editing panel
 #[derive(Debug, Clone, Copy, Data, Lens)]
 pub struct CoordinateSelection {
+    /// the number of selected points
     pub count: usize,
+    /// the bounding box of the selection
     pub frame: Rect,
     pub quadrant: Quadrant,
 }
@@ -466,6 +468,25 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn transform_selection(&mut self, affine: Affine) {
+        if self.selection.is_empty() {
+            return;
+        }
+
+        let sel = PathSelection::new(&self.selection);
+        for path_points in sel.iter() {
+            if let Some(path) = self.path_for_point_mut(path_points[0]) {
+                path.transform_points(path_points, affine);
+            } else if path_points[0].is_guide() {
+                //for id in path_points {
+                //if let Some(guide) = self.guides_mut().iter_mut().find(|g| g.id == *id) {
+                ////guide.nudge(nudge);
+                //}
+                //}
+            }
+        }
+    }
+
     pub(crate) fn update_handle(&mut self, point: Point, is_locked: bool) {
         let dpoint = self.viewport.from_screen(point);
         let id = *self.selection.iter().next().unwrap();
@@ -604,6 +625,10 @@ impl CoordinateSelection {
     /// a lens to return the point representation of the current selected coord(s)
     #[allow(non_upper_case_globals)]
     pub const quadrant_coord: lenses::QuadrantCoord = lenses::QuadrantCoord;
+
+    /// a lens to return the bbox of the current selection
+    #[allow(non_upper_case_globals)]
+    pub const quadrant_bbox: lenses::QuadrantBbox = lenses::QuadrantBbox;
 }
 
 static ALL_QUADRANTS: &[Quadrant] = &[
@@ -680,6 +705,23 @@ impl Quadrant {
         };
         flipped.pos_in_size(rect.size()) + rect.origin().to_vec2()
     }
+
+    /// given a translation relative to the origin, compute an affine
+    /// representing that translation relative to our state.
+    fn translation_matrix(self, delta: Vec2) -> Affine {
+        let translation = match self {
+            Quadrant::TopLeft => (0.0, delta.y),
+            Quadrant::Top => (delta.x / 2.0, delta.y),
+            Quadrant::TopRight => (delta.x, delta.y),
+            Quadrant::Left => (0.0, delta.y / 2.0),
+            Quadrant::Center => (delta.x / 2.0, delta.y / 2.0),
+            Quadrant::Right => (delta.x, delta.y / 2.0),
+            Quadrant::BottomLeft => (0., 0.),
+            Quadrant::Bottom => (delta.x / 2.0, 0.0),
+            Quadrant::BottomRight => (delta.x, 0.0),
+        };
+        Affine::translate(translation)
+    }
 }
 
 pub mod lenses {
@@ -714,9 +756,19 @@ pub mod lenses {
                 frame,
             };
             let r = f(&mut sel);
-            if sel.frame != frame {
+            if sel.frame.origin() != frame.origin() {
                 let delta = sel.frame.origin() - frame.origin();
                 data.nudge_selection(DVec2::from_raw(delta));
+            }
+
+            if sel.frame.size() != frame.size() {
+                //let scale = sel.frame.size().to_vec2() / frame.size().to_vec2();
+                let scale_x = sel.frame.width() / frame.width();
+                let scale_y = sel.frame.height() / frame.height();
+                let scale = Affine::scale_non_uniform(scale_x, scale_y);
+                let translate = frame.size().to_vec2() - sel.frame.size().to_vec2();
+                let translate = sel.quadrant.translation_matrix(translate);
+                data.transform_selection(translate * scale);
             }
             data.quadrant = sel.quadrant;
             r
@@ -743,6 +795,30 @@ pub mod lenses {
             if point != point2 {
                 let delta = point2 - point;
                 data.frame = data.frame.with_origin(data.frame.origin() + delta);
+            }
+            r
+        }
+    }
+
+    pub struct QuadrantBbox;
+
+    impl Lens<CoordinateSelection, Size> for QuadrantBbox {
+        fn with<V, F: FnOnce(&Size) -> V>(&self, data: &CoordinateSelection, f: F) -> V {
+            //let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
+            f(&data.frame.size())
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Size) -> V>(
+            &self,
+            data: &mut CoordinateSelection,
+            f: F,
+        ) -> V {
+            let size = data.frame.size();
+            let mut size2 = size;
+            let r = f(&mut size2);
+
+            if size != size2 {
+                data.frame = data.frame.with_size(size2);
             }
             r
         }
