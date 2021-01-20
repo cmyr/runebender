@@ -236,8 +236,16 @@ impl PathPoints {
     /// it will start at the first point.
     pub fn cursor(&mut self, id: Option<EntityId>) -> Cursor {
         let idx = id
-            .map(|id| self.points.index_for_point(id))
-            .unwrap_or_else(|| Some(if self.closed { self.len() - 1 } else { 0 }));
+            .and_then(|id| self.points.index_for_point(id))
+            .or_else(|| {
+                if self.closed {
+                    self.len().checked_sub(1)
+                } else if self.points.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                }
+            });
         Cursor { idx, inner: self }
     }
 
@@ -518,8 +526,25 @@ impl PathPoints {
         }
 
         self.points_mut().retain(|p| !to_delete.contains(&p.id));
+
+        // normalize our representation
+        let len = self.points.len();
+        if len > 2
+            && !self.points.as_ref()[0].is_on_curve()
+            && !self.points.as_ref()[len - 1].is_on_curve()
+        {
+            self.points_mut().rotate_left(1);
+        }
+
+        // if we have fewer than three on_curve points we are open.
+        if self.points.len() < 3 {
+            self.closed = false;
+        }
+
+        // fixup smooth/corner types
         let mut cursor = self.cursor(None);
         let start_id = cursor.point().map(|pp| pp.id);
+
         loop {
             let next_is_on = cursor.peek_next().map(PathPoint::is_on_curve);
             let prev_is_on = cursor.peek_prev().map(PathPoint::is_on_curve);
@@ -535,20 +560,6 @@ impl PathPoints {
             if cursor.point().map(|pp| pp.id) == start_id {
                 break;
             }
-        }
-
-        // normalize our representation
-        let len = self.points.len();
-        if len > 2
-            && !self.points.as_ref()[0].is_on_curve()
-            && !self.points.as_ref()[len - 1].is_on_curve()
-        {
-            self.points_mut().rotate_left(1);
-        }
-
-        // if we have fewer than three on_curve points we are open.
-        if self.points.len() < 3 {
-            self.closed = false;
         }
     }
 
