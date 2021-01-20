@@ -487,7 +487,7 @@ impl PathPoints {
             let on_curve = cursor
                 .peek_next()
                 .filter(|p| p.is_on_curve())
-                .or(cursor.peek_prev().filter(|p| p.is_on_curve()))
+                .or_else(|| cursor.peek_prev().filter(|p| p.is_on_curve()))
                 .copied()
                 .unwrap(); // all off curve points have one on_curve neighbour
             if on_curve.is_smooth() {
@@ -495,9 +495,11 @@ impl PathPoints {
                 let other_off_curve = cursor
                     .peek_next()
                     .filter(|p| p.is_off_curve() && p.id != point)
-                    .or(cursor
-                        .peek_prev()
-                        .filter(|p| p.is_off_curve() && p.id != point))
+                    .or_else(|| {
+                        cursor
+                            .peek_prev()
+                            .filter(|p| p.is_off_curve() && p.id != point)
+                    })
                     .map(|p| p.id);
                 Some((on_curve.id, other_off_curve))
             } else {
