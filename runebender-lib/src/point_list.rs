@@ -653,8 +653,8 @@ impl PathPoints {
             )
         };
 
-        let prev_and_next_both_off_curve = prev.map(|pp| pp.is_off_curve()).unwrap_or(false)
-            && next.map(|pp| pp.is_off_curve()).unwrap_or(false);
+        let prev_is_offcurve = prev.map(|pp| pp.is_off_curve()).unwrap_or(false);
+        let next_is_offcurve = next.map(|pp| pp.is_off_curve()).unwrap_or(false);
 
         to_delete.insert(point.id);
         if point.is_off_curve() {
@@ -664,9 +664,24 @@ impl PathPoints {
             {
                 to_delete.insert(other_off_curve.id);
             }
-        } else if prev_and_next_both_off_curve {
+        } else if prev_is_offcurve && next_is_offcurve {
             to_delete.extend(prev.map(|pp| pp.id));
             to_delete.extend(next.map(|pp| pp.id));
+        // curve at end of open path: remove whole segment
+        } else if prev_is_offcurve && next.is_none() {
+            let prev2 = self
+                .cursor(prev.map(|pp| pp.id))
+                .peek_prev()
+                .map(|pp| pp.id);
+            to_delete.extend(prev.map(|pp| pp.id));
+            to_delete.extend(prev2);
+        } else if next_is_offcurve && prev.is_none() {
+            let next2 = self
+                .cursor(next.map(|pp| pp.id))
+                .peek_next()
+                .map(|pp| pp.id);
+            to_delete.extend(next.map(|pp| pp.id));
+            to_delete.extend(next2);
         }
     }
 
