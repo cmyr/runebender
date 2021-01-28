@@ -255,17 +255,12 @@ impl PathPoints {
     /// If you pass a point id, the cursor will start at that point; if not
     /// it will start at the first point.
     pub fn cursor(&mut self, id: Option<EntityId>) -> Cursor {
-        let idx = id
-            .and_then(|id| self.points.index_for_point(id))
-            .or_else(|| {
-                if self.closed {
-                    self.len().checked_sub(1)
-                } else if self.points.is_empty() {
-                    None
-                } else {
-                    Some(0)
-                }
-            });
+        let idx = match id {
+            Some(id) => self.points.index_for_point(id),
+            None if self.closed => self.len().checked_sub(1),
+            None if self.points.is_empty() => None,
+            None => Some(0),
+        };
         Cursor { idx, inner: self }
     }
 
